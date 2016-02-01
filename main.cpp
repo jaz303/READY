@@ -3,14 +3,16 @@
 #include <stdlib.h>
 #include <SDL2/SDL.h>
 
+typedef float real;
+
 struct vec2 {
-	float x, y;
+	real x, y;
 	vec2() : x(0.0f), y(0.0f) {}
 };
 
 struct panel_t;
 struct panel_t {
-	float x, y, width, height;
+	real x, y, width, height;
 	uint32_t color;
 	panel_t *prev;
 	panel_t *next;
