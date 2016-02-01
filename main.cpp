@@ -49,7 +49,7 @@ void render(SDL_Surface *surface) {
 	}
 }
 
-bool eventIsPositional(SDL_Event *evt, vec2 *outPosition) {
+bool eventIsSpatial(SDL_Event *evt, vec2 *outPosition) {
 	switch (evt->type) {
 		case SDL_MOUSEMOTION:
 			outPosition->x = evt->motion.x;
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		vec2 eventPos;
-		if (eventIsPositional(&evt, &eventPos)) {
+		if (eventIsSpatial(&evt, &eventPos)) {
 			panel_t *eventPanel = findPanelAtPoint(eventPos);
 			if (eventPanel) {
 				eventPanel->handler(&evt, eventPanel);
