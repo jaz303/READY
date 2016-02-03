@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 
 typedef float real;
 
@@ -9,6 +10,43 @@ struct vec2 {
 	real x, y;
 	vec2() : x(0.0f), y(0.0f) {}
 };
+
+struct font_t {
+	SDL_Surface *surface;
+	int charWidth, charHeight;
+	int rows, columns;
+};
+
+bool loadFont(const char *filename, font_t *font) {
+	font->surface = IMG_Load(filename);
+	if (font->surface == NULL) {
+		return false;
+	}
+	// assume 32x8 chars
+	font->charWidth = font->surface->w / 32;
+	font->charHeight = font->surface->h / 8;
+	return true;
+}
+
+void blitString(SDL_Surface *surface, font_t *font, const char *str, int x, int y) {
+	SDL_Rect srcRect, destRect;
+	destRect.x = x;
+	destRect.y = y;
+	srcRect.w = destRect.w = font->charWidth;
+	srcRect.h = destRect.h = font->charHeight;
+	while (*str) {
+		if (*str == '\n') {
+			destRect.x = x;
+			destRect.y += font->charHeight;
+		} else {
+			srcRect.x = (*str & 0x1F) * font->charWidth;
+			srcRect.y = (*str >> 5) * font->charHeight;
+			SDL_BlitSurface(font->surface, &srcRect, surface, &destRect);
+			destRect.x += font->charWidth;
+		}
+		str++;
+	}
+}
 
 struct panel_t;
 struct panel_t {
@@ -20,6 +58,8 @@ struct panel_t {
 	void (*handler)(SDL_Event*, panel_t*);
 };
 
+font_t systemFont;
+
 panel_t *rootPanel = NULL;
 panel_t *endPanel = NULL;
 panel_t *keyPanel = NULL;
@@ -29,7 +69,7 @@ void makeKeyPanel(panel_t *panel) {
 }
 
 void handler1(SDL_Event *evt, panel_t *panel) {
-	printf("handler %p\n", panel->userdata);
+	//printf("handler %p\n", panel->userdata);
 	if (evt->type == SDL_MOUSEBUTTONDOWN) {
 		makeKeyPanel(panel);
 	}
@@ -126,8 +166,13 @@ int main(int argc, char *argv[]) {
 	rootPanel->next->userdata = (void*)0x02;
 
 	endPanel = rootPanel->next;
+
+	loadFont("fonts/FJG.gif", &systemFont);
 	
 	render(surface);
+
+	blitString(surface, &systemFont, "Hello World", 10, 10);
+
 	SDL_UpdateWindowSurface(window);
 
 	SDL_Event evt;
