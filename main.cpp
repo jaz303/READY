@@ -15,20 +15,39 @@ struct font_t {
 	SDL_Surface *surface;
 	int charWidth, charHeight;
 	int rows, columns;
+	SDL_Color *bgColor;
+	SDL_Color *fgColor;
 };
 
-bool loadFont(const char *filename, font_t *font) {
+// fonts are, for now, 2-color images with indexed pixel formats
+bool loadFont(const char *filename, font_t *font, Uint8 r, Uint8 g, Uint8 b) {
 	font->surface = IMG_Load(filename);
 	if (font->surface == NULL) {
 		return false;
 	}
+	
+	printf("loaded font %s, pixel format = %s\n", filename, SDL_GetPixelFormatName(font->surface->format->format));
+	printf("colors in palette = %d\n", font->surface->format->palette->ncolors);
+
+	// find the background colour and set it as the colour key
+	Uint32 bgIndex = SDL_MapRGB(font->surface->format, r, g, b);
+	SDL_SetColorKey(font->surface, SDL_TRUE, bgIndex);
+	printf("background index = %d\n", bgIndex);
+
+	// store a pointer to the foreground colour's palette entry so we can update it when we blit the string
+	font->fgColor = &font->surface->format->palette->colors[bgIndex == 1 ? 0 : 1];
+
 	// assume 32x8 chars
 	font->charWidth = font->surface->w / 32;
 	font->charHeight = font->surface->h / 8;
+
 	return true;
 }
 
-void blitString(SDL_Surface *surface, font_t *font, const char *str, int x, int y) {
+void blitString(SDL_Surface *surface, font_t *font, const char *str, int x, int y, int r = 255, int g = 255, int b = 255) {
+	font->fgColor->r = r;
+	font->fgColor->g = g;
+	font->fgColor->b = b;
 	SDL_Rect srcRect, destRect;
 	destRect.x = x;
 	destRect.y = y;
@@ -150,7 +169,7 @@ int main(int argc, char *argv[]) {
 	rootPanel->width = 500;
 	rootPanel->height = 600;
 	rootPanel->prev = NULL;
-	rootPanel->color = SDL_MapRGB(surface->format, 0xFF, 0x00, 0x00);
+	rootPanel->color = SDL_MapRGB(surface->format, 0x01, 0x00, 0x7F);
 	rootPanel->handler = handler1;
 	rootPanel->userdata = (void*)0x01;
 
@@ -167,11 +186,12 @@ int main(int argc, char *argv[]) {
 
 	endPanel = rootPanel->next;
 
-	loadFont("fonts/FJG.gif", &systemFont);
+	loadFont("fonts/FJG.gif", &systemFont, 0xFF, 0xFF, 0xFF);
 	
 	render(surface);
 
-	blitString(surface, &systemFont, "Hello World", 10, 10);
+	blitString(surface, &systemFont, "Hello World\nREADY", 10, 10, 0xff, 0xff, 0x0b);
+	blitString(surface, &systemFont, "> (+ 20 30)\n 50", 10, 42, 0xff, 0xff, 0x00);
 
 	SDL_UpdateWindowSurface(window);
 
