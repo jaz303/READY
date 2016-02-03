@@ -1,5 +1,5 @@
 main: main.cpp
-	g++ -lSDL2 -lSDL2_image -lcairo -o $@ $<
+	g++ -lSDL2 -lSDL2_image -o $@ $<
 
 clean:
 	rm -f main
