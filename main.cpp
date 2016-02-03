@@ -22,13 +22,17 @@ struct panel_t {
 
 panel_t *rootPanel = NULL;
 panel_t *endPanel = NULL;
+panel_t *keyPanel = NULL;
 
-void handler1(SDL_Event *evt, panel_t *panel) {
-	printf("handler 1\n");
+void makeKeyPanel(panel_t *panel) {
+	keyPanel = panel;
 }
 
-void handler2(SDL_Event *evt, panel_t *panel) {
-	printf("handler 2\n");
+void handler1(SDL_Event *evt, panel_t *panel) {
+	printf("handler %p\n", panel->userdata);
+	if (evt->type == SDL_MOUSEBUTTONDOWN) {
+		makeKeyPanel(panel);
+	}
 }
 
 void render(SDL_Surface *surface) {
@@ -70,6 +74,13 @@ bool eventIsSpatial(SDL_Event *evt, vec2 *outPosition) {
 	return false;
 }
 
+bool eventIsKeyboard(SDL_Event *evt) {
+	return evt->type == SDL_KEYDOWN
+			|| evt->type == SDL_KEYUP
+			|| evt->type == SDL_TEXTEDITING
+			|| evt->type == SDL_TEXTINPUT;
+}
+
 panel_t* findPanelAtPoint(vec2 point) {
 	panel_t *p = endPanel;
 	while (p) {
@@ -101,6 +112,7 @@ int main(int argc, char *argv[]) {
 	rootPanel->prev = NULL;
 	rootPanel->color = SDL_MapRGB(surface->format, 0xFF, 0x00, 0x00);
 	rootPanel->handler = handler1;
+	rootPanel->userdata = (void*)0x01;
 
 	rootPanel->next = (panel_t*) malloc(sizeof(panel_t));
 	rootPanel->next->x = 470;
@@ -110,7 +122,8 @@ int main(int argc, char *argv[]) {
 	rootPanel->next->prev = rootPanel;
 	rootPanel->next->next = NULL;
 	rootPanel->next->color = SDL_MapRGB(surface->format, 0x00, 0xFF, 0x00);
-	rootPanel->next->handler = handler2;
+	rootPanel->next->handler = handler1;
+	rootPanel->next->userdata = (void*)0x02;
 
 	endPanel = rootPanel->next;
 	
@@ -130,6 +143,8 @@ int main(int argc, char *argv[]) {
 			if (eventPanel) {
 				eventPanel->handler(&evt, eventPanel);
 			}
+		} else if (keyPanel && eventIsKeyboard(&evt)) {
+			keyPanel->handler(&evt, keyPanel);
 		}
 	}
 
