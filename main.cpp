@@ -22,6 +22,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
+#include "keymap.qwerty.inc.cpp"
+
 typedef float real;
 
 struct vec2 {
@@ -106,9 +108,33 @@ void makeKeyPanel(panel_t *panel) {
 	keyPanel = panel;
 }
 
-struct console_state_t {
-	
+struct console_line_t {
+	int length; // number of characters
+	int pixelHeight; // computed based on panel width, character height and line length
+	char *buffer;
+	int bufferSize;
 };
+
+struct console_state_t {
+	int maxLines, startLine, endLine;
+	bool empty;
+	console_line_t lines[512];
+};
+
+void consoleInit(console_state_t *console) {
+	console->maxLines = 512;
+	console->startLine = 0;
+	console->endLine = 0;
+	console->empty = true;
+}
+
+void consoleAppendChar(console_state_t *console, char ch) {
+
+}
+
+void consoleEndLine(console_state_t *console) {
+
+}
 
 void consolePanelHandler(SDL_Event *evt, panel_t *panel) {
 	console_state_t *console = (console_state_t*)panel->userdata;
@@ -116,8 +142,51 @@ void consolePanelHandler(SDL_Event *evt, panel_t *panel) {
 		makeKeyPanel(panel);
 	}
 	if (evt->type == SDL_KEYDOWN) {
-		printf("keydown\n");
+		SDL_Scancode sc = evt->key.keysym.scancode;
+		Uint16 mod = evt->key.keysym.mod;
+		char ch = 0;
+		if (sc < 256) {
+			if (mod & KMOD_SHIFT) {
+				ch = keyCharShiftMap[sc];
+			} else {
+				ch = keyCharMap[sc];
+			}
+			if (mod & KMOD_CAPS) {
+				if (ch >= 65 && ch <= 90) {
+					ch += 32;
+				} else if (ch >= 97 && ch <= 122) {
+					ch -= 32;
+				}
+			}
+		} else {
+			printf("weird scan code: %d\n", sc);
+		}
+		if (ch > 0) {
+			printf("char: %c\n", ch);
+		} else {
+			SDL_Keycode sym = evt->key.keysym.sym;
+			if (sym == SDLK_BACKSPACE) {
+				printf("backspace!\n");
+			} else if (sym == SDLK_RETURN) {
+				printf("enter!\n");
+			}
+		}
 	}
+}
+
+void consolePanelRender(SDL_Surface *surface, SDL_Rect *rect, panel_t *panel) {
+	console_state_t *console = (console_state_t*)panel->userdata;
+	
+	SDL_FillRect(surface, rect, panel->color);
+	
+	if (console->empty) {
+		return;
+	}
+
+
+
+
+	// TODO: render content
 }
 
 void handler1(SDL_Event *evt, panel_t *panel) {
@@ -125,12 +194,6 @@ void handler1(SDL_Event *evt, panel_t *panel) {
 	if (evt->type == SDL_MOUSEBUTTONDOWN) {
 		makeKeyPanel(panel);
 	}
-}
-
-void consolePanelRender(SDL_Surface *surface, SDL_Rect *rect, panel_t *panel) {
-	console_state_t *console = (console_state_t*)panel->userdata;
-	SDL_FillRect(surface, rect, panel->color);
-	// TODO: render content
 }
 
 void renderColorBox(SDL_Surface *surface, SDL_Rect *rect, panel_t *panel) {
@@ -152,9 +215,12 @@ void render(SDL_Surface *surface) {
 		destRect.y = p->y;
 		destRect.w = p->width;
 		destRect.h = p->height;
+		SDL_SetClipRect(surface, &destRect);
 		p->render(surface, &destRect, p);
 		p = p->next;
 	}
+
+	SDL_SetClipRect(surface, NULL);
 }
 
 bool eventIsSpatial(SDL_Event *evt, vec2 *outPosition) {
@@ -207,6 +273,7 @@ int main(int argc, char *argv[]) {
 	SDL_Surface *surface = SDL_GetWindowSurface(window);
 
 	console_state_t consoleState;
+	consoleInit(&consoleState);
 
 	rootPanel = (panel_t*) malloc(sizeof(panel_t));
 	rootPanel->x = 10;

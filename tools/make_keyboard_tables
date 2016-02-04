@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+g++ -o make_keyboard_tables.out -lSDL2 make_keyboard_tables.cpp
+./make_keyboard_tables.out > ../keymap.qwerty.inc.cpp
+rm -f make_keyboard_tables.out
