@@ -93,6 +93,7 @@ struct panel_t {
 	panel_t *next;
 	void *userdata;
 	void (*handler)(SDL_Event*, panel_t*);
+	void (*render)(SDL_Surface*, SDL_Rect*, panel_t*);
 };
 
 font_t systemFont;
@@ -105,11 +106,35 @@ void makeKeyPanel(panel_t *panel) {
 	keyPanel = panel;
 }
 
+struct console_state_t {
+	
+};
+
+void consolePanelHandler(SDL_Event *evt, panel_t *panel) {
+	console_state_t *console = (console_state_t*)panel->userdata;
+	if (evt->type == SDL_MOUSEBUTTONDOWN) {
+		makeKeyPanel(panel);
+	}
+	if (evt->type == SDL_KEYDOWN) {
+		printf("keydown\n");
+	}
+}
+
 void handler1(SDL_Event *evt, panel_t *panel) {
 	//printf("handler %p\n", panel->userdata);
 	if (evt->type == SDL_MOUSEBUTTONDOWN) {
 		makeKeyPanel(panel);
 	}
+}
+
+void consolePanelRender(SDL_Surface *surface, SDL_Rect *rect, panel_t *panel) {
+	console_state_t *console = (console_state_t*)panel->userdata;
+	SDL_FillRect(surface, rect, panel->color);
+	// TODO: render content
+}
+
+void renderColorBox(SDL_Surface *surface, SDL_Rect *rect, panel_t *panel) {
+	SDL_FillRect(surface, rect, panel->color);
 }
 
 void render(SDL_Surface *surface) {
@@ -127,7 +152,7 @@ void render(SDL_Surface *surface) {
 		destRect.y = p->y;
 		destRect.w = p->width;
 		destRect.h = p->height;
-		SDL_FillRect(surface, &destRect, p->color);
+		p->render(surface, &destRect, p);
 		p = p->next;
 	}
 }
@@ -181,6 +206,8 @@ int main(int argc, char *argv[]) {
 	SDL_Window *window = SDL_CreateWindow("READY", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 768, 0);
 	SDL_Surface *surface = SDL_GetWindowSurface(window);
 
+	console_state_t consoleState;
+
 	rootPanel = (panel_t*) malloc(sizeof(panel_t));
 	rootPanel->x = 10;
 	rootPanel->y = 10;
@@ -188,8 +215,9 @@ int main(int argc, char *argv[]) {
 	rootPanel->height = 600;
 	rootPanel->prev = NULL;
 	rootPanel->color = SDL_MapRGB(surface->format, 0x01, 0x00, 0x7F);
-	rootPanel->handler = handler1;
-	rootPanel->userdata = (void*)0x01;
+	rootPanel->handler = consolePanelHandler;
+	rootPanel->render = consolePanelRender;
+	rootPanel->userdata = (void*)(&consoleState);
 
 	rootPanel->next = (panel_t*) malloc(sizeof(panel_t));
 	rootPanel->next->x = 470;
@@ -200,36 +228,38 @@ int main(int argc, char *argv[]) {
 	rootPanel->next->next = NULL;
 	rootPanel->next->color = SDL_MapRGB(surface->format, 0x00, 0xFF, 0x00);
 	rootPanel->next->handler = handler1;
+	rootPanel->next->render = renderColorBox;
 	rootPanel->next->userdata = (void*)0x02;
 
 	endPanel = rootPanel->next;
 
 	loadFont("fonts/FJG.gif", &systemFont, 0xFF, 0xFF, 0xFF);
 	
-	render(surface);
-
-	blitString(surface, &systemFont, "Hello World\nREADY", 10, 10, 0xff, 0xff, 0x0b);
-	blitString(surface, &systemFont, "> (+ 20 30)\n 50", 10, 42, 0xff, 0xff, 0x00);
-
-	SDL_UpdateWindowSurface(window);
-
-	SDL_Event evt;
 	while (1) {
-		SDL_WaitEvent(&evt);
-		if (evt.type == SDL_WINDOWEVENT && evt.window.event == SDL_WINDOWEVENT_CLOSE) {
-			break;
-		}
-
-		vec2 eventPos;
-		if (eventIsSpatial(&evt, &eventPos)) {
-			panel_t *eventPanel = findPanelAtPoint(eventPos);
-			if (eventPanel) {
-				eventPanel->handler(&evt, eventPanel);
+		SDL_Event evt;
+		while (SDL_PollEvent(&evt)) {
+			if (evt.type == SDL_WINDOWEVENT && evt.window.event == SDL_WINDOWEVENT_CLOSE) {
+				goto exit;
 			}
-		} else if (keyPanel && eventIsKeyboard(&evt)) {
-			keyPanel->handler(&evt, keyPanel);
+			vec2 eventPos;
+			if (eventIsSpatial(&evt, &eventPos)) {
+				panel_t *eventPanel = findPanelAtPoint(eventPos);
+				if (eventPanel) {
+					eventPanel->handler(&evt, eventPanel);
+				}
+			} else if (keyPanel && eventIsKeyboard(&evt)) {
+				keyPanel->handler(&evt, keyPanel);
+			}
 		}
+		render(surface);
+		// blitString(surface, &systemFont, "Hello World\nREADY", 10, 10, 0xff, 0xff, 0x0b);
+		// blitString(surface, &systemFont, "> (+ 20 30)\n 50", 10, 42, 0xff, 0xff, 0x00);
+		SDL_UpdateWindowSurface(window);
+		// TODO: proper timing loop
+		SDL_Delay(33);
 	}
+
+exit:
 
 	SDL_DestroyWindow(window);
 	SDL_Quit();
