@@ -362,6 +362,9 @@ int main(int argc, char *argv[]) {
 	console_state_t consoleState;
 	consoleInit(&consoleState);
 
+	console_state_t consoleState2;
+	consoleInit(&consoleState2);
+
 	rootPanel = (panel_t*) malloc(sizeof(panel_t));
 	rootPanel->x = 0;
 	rootPanel->y = 0;
@@ -381,9 +384,9 @@ int main(int argc, char *argv[]) {
 	rootPanel->next->prev = rootPanel;
 	rootPanel->next->next = NULL;
 	rootPanel->next->color = SDL_MapRGB(surface->format, 0x00, 0xFF, 0x00);
-	rootPanel->next->handler = handler1;
-	rootPanel->next->render = renderColorBox;
-	rootPanel->next->userdata = (void*)0x02;
+	rootPanel->next->handler = consolePanelHandler;
+	rootPanel->next->render = consolePanelRender;
+	rootPanel->next->userdata = (void*)&consoleState2;
 
 	endPanel = rootPanel->next;
 
