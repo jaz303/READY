@@ -14,6 +14,7 @@ int main(int argc, char *argv[]) {
         } else {
             switch (k) {
                 case '\\': printf("    '\\\\',\n"); break;
+                keycase(' ', ' ');
                 keycase('-', '-');
                 keycase('=', '=');
                 keycase('[', '[');
@@ -47,6 +48,7 @@ int main(int argc, char *argv[]) {
                 keycase('8', '*');
                 keycase('9', '(');
                 keycase('0', ')');
+                keycase(' ', ' ');
                 keycase('\\', '|');
                 keycase('-', '_');
                 keycase('=', '+');
