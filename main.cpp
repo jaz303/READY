@@ -64,6 +64,17 @@ bool loadFont(const char *filename, font_t *font, Uint8 r, Uint8 g, Uint8 b) {
 	return true;
 }
 
+void blitChar(SDL_Surface *surface, font_t *font, char ch, int x, int y) {
+	SDL_Rect srcRect, destRect;
+	srcRect.x = (ch & 0x1F) * font->charWidth;
+	srcRect.y = (ch >> 5) * font->charHeight;
+	destRect.x = x;
+	destRect.y = y;
+	srcRect.w = destRect.w = font->charWidth;
+	srcRect.h = destRect.h = font->charHeight;
+	SDL_BlitSurface(font->surface, &srcRect, surface, &destRect);
+}
+
 void blitString(SDL_Surface *surface, font_t *font, const char *str, int x, int y, int r = 255, int g = 255, int b = 255) {
 	font->fgColor->r = r;
 	font->fgColor->g = g;
@@ -109,7 +120,8 @@ void makeKeyPanel(panel_t *panel) {
 }
 
 struct console_line_t {
-	int length; // number of characters
+	int length; // number of characters, excluding null terminator
+	int promptLength;
 	int pixelHeight; // computed based on panel width, character height and line length
 	char *buffer;
 	int bufferSize;
@@ -121,19 +133,68 @@ struct console_state_t {
 	console_line_t lines[512];
 };
 
+void consoleBackwardsDeleteChar(console_state_t *console) {
+
+}
+
+void consoleGrowBuffer(console_line_t *line, int dlen) {
+	int requiredSize = line->length + dlen + 1;
+	if (line->bufferSize < requiredSize) {
+		while (line->bufferSize < requiredSize) {
+			line->bufferSize *= 2;
+		}
+		line->buffer = (char*)realloc(line->buffer, line->bufferSize);
+		// TODO: check for failure
+	}
+}
+
+void consoleAppend(console_state_t *console, char ch) {
+	console_line_t *line = &console->lines[console->endLine];
+	consoleGrowBuffer(line, 1);
+	line->buffer[line->length++] = ch;
+	line->buffer[line->length] = 0;
+}
+
+void consoleAppend(console_state_t *console, const char *str) {
+	console_line_t *line = &console->lines[console->endLine];
+	consoleGrowBuffer(line, strlen(str));
+	while (*str) {
+		line->buffer[line->length++] = *(str++);
+	}
+	line->buffer[line->length] = 0;
+}
+
+void consoleStartLine(console_state_t *console, const char *prompt = NULL) {
+	if (console->empty) {
+		console->empty = false;
+	} else {
+		console->endLine = (console->endLine + 1) % console->maxLines;
+		if (console->endLine == console->startLine) {
+			free(console->lines[console->endLine].buffer);
+			console->startLine = (console->startLine + 1) % console->maxLines;
+		}
+	}
+	int line = console->endLine;
+	console->lines[line].length = 0;
+	console->lines[line].buffer = (char*)malloc(128);
+	// TODO: check for failure
+	console->lines[line].buffer[0] = 0;
+	console->lines[line].bufferSize = 128;
+	if (prompt != NULL) {
+		consoleAppend(console, prompt);
+		console->lines[line].promptLength = strlen(prompt);
+	} else {
+		console->lines[line].promptLength = 0;
+	}
+}
+
 void consoleInit(console_state_t *console) {
 	console->maxLines = 512;
 	console->startLine = 0;
 	console->endLine = 0;
 	console->empty = true;
-}
-
-void consoleAppendChar(console_state_t *console, char ch) {
-
-}
-
-void consoleEndLine(console_state_t *console) {
-
+	consoleStartLine(console, "READY");
+	consoleStartLine(console, "> ");
 }
 
 void consolePanelHandler(SDL_Event *evt, panel_t *panel) {
@@ -162,13 +223,13 @@ void consolePanelHandler(SDL_Event *evt, panel_t *panel) {
 			printf("weird scan code: %d\n", sc);
 		}
 		if (ch > 0) {
-			printf("char: %c\n", ch);
+			consoleAppend(console, ch);
 		} else {
 			SDL_Keycode sym = evt->key.keysym.sym;
 			if (sym == SDLK_BACKSPACE) {
-				printf("backspace!\n");
+				consoleBackwardsDeleteChar(console);
 			} else if (sym == SDLK_RETURN) {
-				printf("enter!\n");
+				consoleStartLine(console, "> ");
 			}
 		}
 	}
@@ -183,10 +244,31 @@ void consolePanelRender(SDL_Surface *surface, SDL_Rect *rect, panel_t *panel) {
 		return;
 	}
 
+	int padding = 10;
+	int availableWidth = panel->width - (padding * 2);
+	int charsWide = availableWidth / (systemFont.charWidth);
+	int startX = panel->x + padding;
+	int maxX = startX + (charsWide * systemFont.charWidth);
+	int currY = panel->y + padding;
+	int lineIndex = console->startLine;
 
-
-
-	// TODO: render content
+	while (true) {
+		console_line_t *line = &console->lines[lineIndex];
+		int currX = startX;
+		for (int i = 0; i < line->length; ++i) {
+			blitChar(surface, &systemFont, line->buffer[i], currX, currY);
+			currX += systemFont.charWidth;
+			if (currX >= maxX) {
+				currX = startX;
+				currY += systemFont.charHeight;
+			}
+		}
+		currY += systemFont.charHeight;
+		if (lineIndex == console->endLine) {
+			break;
+		}
+		lineIndex = (lineIndex + 1) % console->maxLines;
+	}
 }
 
 void handler1(SDL_Event *evt, panel_t *panel) {
@@ -262,6 +344,9 @@ panel_t* findPanelAtPoint(vec2 point) {
 
 int main(int argc, char *argv[]) {
 
+	const int windowWidth = 800;
+	const int windowHeight = 600;
+
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_EVENTS) != 0) {
 		fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
 		return 1;
@@ -269,17 +354,17 @@ int main(int argc, char *argv[]) {
 
 	atexit(SDL_Quit);
 
-	SDL_Window *window = SDL_CreateWindow("READY", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 768, 0);
+	SDL_Window *window = SDL_CreateWindow("READY", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, windowWidth, windowHeight, 0);
 	SDL_Surface *surface = SDL_GetWindowSurface(window);
 
 	console_state_t consoleState;
 	consoleInit(&consoleState);
 
 	rootPanel = (panel_t*) malloc(sizeof(panel_t));
-	rootPanel->x = 10;
-	rootPanel->y = 10;
-	rootPanel->width = 500;
-	rootPanel->height = 600;
+	rootPanel->x = 0;
+	rootPanel->y = 0;
+	rootPanel->width = windowWidth / 2;
+	rootPanel->height = windowHeight;
 	rootPanel->prev = NULL;
 	rootPanel->color = SDL_MapRGB(surface->format, 0x01, 0x00, 0x7F);
 	rootPanel->handler = consolePanelHandler;
@@ -287,10 +372,10 @@ int main(int argc, char *argv[]) {
 	rootPanel->userdata = (void*)(&consoleState);
 
 	rootPanel->next = (panel_t*) malloc(sizeof(panel_t));
-	rootPanel->next->x = 470;
-	rootPanel->next->y = 100;
-	rootPanel->next->width = 300;
-	rootPanel->next->height = 300;
+	rootPanel->next->x = windowWidth / 2;
+	rootPanel->next->y = 0;
+	rootPanel->next->width = windowWidth / 2;
+	rootPanel->next->height = windowHeight;
 	rootPanel->next->prev = rootPanel;
 	rootPanel->next->next = NULL;
 	rootPanel->next->color = SDL_MapRGB(surface->format, 0x00, 0xFF, 0x00);
@@ -301,6 +386,8 @@ int main(int argc, char *argv[]) {
 	endPanel = rootPanel->next;
 
 	loadFont("fonts/FJG.gif", &systemFont, 0xFF, 0xFF, 0xFF);
+
+	blitString(surface, &systemFont, "Hello World\nREADY", 10, 10, 0xff, 0xff, 0x0b);
 	
 	while (1) {
 		SDL_Event evt;
@@ -319,7 +406,6 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		render(surface);
-		// blitString(surface, &systemFont, "Hello World\nREADY", 10, 10, 0xff, 0xff, 0x0b);
 		// blitString(surface, &systemFont, "> (+ 20 30)\n 50", 10, 42, 0xff, 0xff, 0x00);
 		SDL_UpdateWindowSurface(window);
 		// TODO: proper timing loop
