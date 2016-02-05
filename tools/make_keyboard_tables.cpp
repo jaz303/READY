@@ -14,13 +14,13 @@ int main(int argc, char *argv[]) {
         } else {
             switch (k) {
                 case '\\': printf("    '\\\\',\n"); break;
+                case '\'': printf("    '\\\'',\n"); break;
                 keycase(' ', ' ');
                 keycase('-', '-');
                 keycase('=', '=');
                 keycase('[', '[');
                 keycase(']', ']');
                 keycase(';', ';');
-                keycase('\'', ',');
                 keycase('#', '#');
                 keycase(',', ',');
                 keycase('.', '.');
