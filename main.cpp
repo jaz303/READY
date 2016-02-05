@@ -119,6 +119,8 @@ void makeKeyPanel(panel_t *panel) {
 	keyPanel = panel;
 }
 
+const int CONSOLE_HISTORY = 512;
+
 struct console_line_t {
 	int length; // number of characters, excluding null terminator
 	int promptLength;
@@ -130,7 +132,7 @@ struct console_line_t {
 struct console_state_t {
 	int maxLines, startLine, endLine;
 	bool empty;
-	console_line_t lines[512];
+	console_line_t lines[CONSOLE_HISTORY];
 };
 
 void consoleBackwardsDeleteChar(console_state_t *console) {
@@ -189,7 +191,7 @@ void consoleStartLine(console_state_t *console, const char *prompt = NULL) {
 }
 
 void consoleInit(console_state_t *console) {
-	console->maxLines = 512;
+	console->maxLines = CONSOLE_HISTORY;
 	console->startLine = 0;
 	console->endLine = 0;
 	console->empty = true;
