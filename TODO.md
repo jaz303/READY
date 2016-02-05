@@ -1,3 +1,6 @@
 [x] basic font support
 [ ] font masking/colors
-[ ] console panel - prompt/command/response thing
+[x] console panel - prompt/command/response thing
+[ ] console - backspace
+[ ] console - render cursor
+[ ] console - left/right arrow keys
